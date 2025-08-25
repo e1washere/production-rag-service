@@ -1,0 +1,2 @@
+# This file ensures the eval directory is tracked by git
+# Add your evaluation datasets (*.jsonl) here

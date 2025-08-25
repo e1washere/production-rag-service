@@ -1,0 +1,187 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set environment variables
+      run: |
+        if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+          echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=rag-service-staging-rg" >> $GITHUB_ENV
+        else
+          echo "ENVIRONMENT=production" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=rag-service-rg" >> $GITHUB_ENV
+        fi
+
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.6.0"
+        terraform_wrapper: false
+
+    - name: Terraform Init
+      working-directory: infra/terraform
+      run: |
+        terraform init \
+          -backend-config="resource_group_name=terraform-state-rg" \
+          -backend-config="storage_account_name=terraformstate${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=${{ env.ENVIRONMENT }}.terraform.tfstate"
+
+    - name: Terraform Plan
+      working-directory: infra/terraform
+      run: |
+        terraform plan \
+          -var="environment=${{ env.ENVIRONMENT }}" \
+          -var="resource_group_name=${{ env.RESOURCE_GROUP_NAME }}" \
+          -var="container_image=ghcr.io/${{ github.repository }}:${{ github.sha }}" \
+          -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
+          -var="groq_api_key=${{ secrets.GROQ_API_KEY }}" \
+          -var="langfuse_secret_key=${{ secrets.LANGFUSE_SECRET_KEY }}" \
+          -var="langfuse_public_key=${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
+          -var="alert_webhook_url=${{ secrets.ALERT_WEBHOOK_URL }}" \
+          -out=tfplan
+
+    - name: Terraform Apply
+      working-directory: infra/terraform
+      run: terraform apply -auto-approve tfplan
+
+    - name: Get deployment outputs
+      id: terraform
+      working-directory: infra/terraform
+      run: |
+        echo "app_url=$(terraform output -raw app_url)" >> $GITHUB_OUTPUT
+        echo "health_check_url=$(terraform output -raw health_check_url)" >> $GITHUB_OUTPUT
+        echo "api_docs_url=$(terraform output -raw api_docs_url)" >> $GITHUB_OUTPUT
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for application to be ready..."
+        for i in {1..30}; do
+          if curl -f -s "${{ steps.terraform.outputs.health_check_url }}" > /dev/null; then
+            echo "✅ Application is healthy!"
+            break
+          fi
+          echo "Attempt $i/30: Application not ready yet, waiting 30s..."
+          sleep 30
+        done
+
+    - name: Run post-deployment smoke tests
+      run: |
+        echo "Running smoke tests against ${{ steps.terraform.outputs.app_url }}"
+        
+        # Health check
+        curl -f "${{ steps.terraform.outputs.health_check_url }}" || exit 1
+        
+        # API docs
+        curl -f "${{ steps.terraform.outputs.api_docs_url }}" || exit 1
+        
+        # Test query endpoint
+        curl -f -X POST "${{ steps.terraform.outputs.app_url }}/query" \
+          -H "Content-Type: application/json" \
+          -d '{"question": "What is machine learning?", "top_k": 3}' || exit 1
+        
+        echo "✅ All post-deployment tests passed!"
+
+    - name: Update deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "🚀 Deployment successful!"
+          echo "App URL: ${{ steps.terraform.outputs.app_url }}"
+          echo "Health Check: ${{ steps.terraform.outputs.health_check_url }}"
+          echo "API Docs: ${{ steps.terraform.outputs.api_docs_url }}"
+        else
+          echo "❌ Deployment failed!"
+        fi
+
+    - name: Notify deployment status
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          Deployment to ${{ env.ENVIRONMENT }} ${{ job.status }}!
+          App URL: ${{ steps.terraform.outputs.app_url }}
+          Commit: ${{ github.sha }}
+          Actor: ${{ github.actor }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      if: env.SLACK_WEBHOOK_URL != ''
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure() && github.event_name == 'push'
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Get previous successful commit
+      id: previous
+      run: |
+        PREV_SHA=$(git rev-parse HEAD~1)
+        echo "previous_sha=$PREV_SHA" >> $GITHUB_OUTPUT
+
+    - name: Rollback to previous version
+      run: |
+        az containerapp update \
+          --name rag-service \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --image ghcr.io/${{ github.repository }}:${{ steps.previous.outputs.previous_sha }}
+
+    - name: Verify rollback
+      run: |
+        sleep 60
+        curl -f "${{ steps.terraform.outputs.health_check_url }}" || exit 1
+        echo "✅ Rollback successful!"
