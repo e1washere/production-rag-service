@@ -1,1 +1,0 @@
-print("Retrieval test placeholder")
