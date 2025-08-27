@@ -166,7 +166,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{"question": "What is AI?", "top_k": 3}' || exit 1
 
-        echo "✅ All smoke tests passed!"
+        echo " All smoke tests passed!"
 
     - name: Stop container
       if: always()

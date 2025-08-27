@@ -41,10 +41,10 @@ test-fast: ## Run tests without coverage
 	python3 -m pytest -q --maxfail=1 --disable-warnings
 
 up: ## Start the development server
-	python3 -c "import sys; sys.path.append('.'); from app.api import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=8000, reload=True)"
+	uvicorn app.api:app --host 0.0.0.0 --port 8000 --reload
 
 up-prod: ## Start production server
-	python3 -c "import sys; sys.path.append('.'); from app.api import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=8000)"
+	uvicorn app.api:app --host 0.0.0.0 --port 8000
 
 clean: ## Clean up generated files
 	find . -type f -name "*.pyc" -delete

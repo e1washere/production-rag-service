@@ -151,8 +151,8 @@ class RAGEvaluator:
 - Hit Rate@5: {hr_5:.3f}
 
 ## Performance Targets
-- Target HR@3: 0.80-0.85 ✅ {'PASS' if 0.80 <= hr_3 <= 0.85 else 'FAIL'}
-- Target HR@5: 0.90-0.95 ✅ {'PASS' if 0.90 <= hr_5 <= 0.95 else 'FAIL'}
+- Target HR@3: 0.80-0.85  {'PASS' if 0.80 <= hr_3 <= 0.85 else 'FAIL'}
+- Target HR@5: 0.90-0.95  {'PASS' if 0.90 <= hr_5 <= 0.95 else 'FAIL'}
 
 ## Recommendations
 """

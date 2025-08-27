@@ -196,7 +196,7 @@ run_smoke_tests() {
 
 # Main deployment flow
 main() {
-    log "🚀 Starting RAG Service deployment"
+    log " Starting RAG Service deployment"
     log "Environment: $ENVIRONMENT"
     log "Image tag: $IMAGE_TAG"
     
@@ -218,7 +218,7 @@ main() {
     wait_for_app "$HEALTH_CHECK_URL"
     run_smoke_tests "$APP_URL"
     
-    success "🎉 Deployment completed successfully!"
+    success " Deployment completed successfully!"
     echo
     echo "🔗 Application URLs:"
     echo "   App: $APP_URL"
@@ -229,7 +229,7 @@ main() {
     log "Deployment summary:"
     log "  Environment: $ENVIRONMENT"
     log "  Image: ghcr.io/e1washere/rag-service:$IMAGE_TAG"
-    log "  Status: ✅ Healthy"
+    log "  Status:  Healthy"
 }
 
 # Trap errors and cleanup

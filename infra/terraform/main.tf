@@ -110,11 +110,11 @@ resource "azurerm_redis_cache" "main" {
   capacity            = 0
   family              = "C"
   sku_name            = "Basic"
-  enable_non_ssl_port = false
+  non_ssl_port_enabled = false
   minimum_tls_version = "1.2"
 
   redis_configuration {
-    enable_authentication = true
+    authentication_enabled = true
   }
 
   tags = var.tags
@@ -246,9 +246,6 @@ resource "azurerm_container_app" "main" {
         port                = 8000
         transport           = "HTTP"
         interval_seconds    = 30
-        timeout_seconds     = 5
-        failure_threshold   = 3
-        success_threshold   = 1
       }
 
       readiness_probe {
@@ -256,20 +253,8 @@ resource "azurerm_container_app" "main" {
         port                = 8000
         transport           = "HTTP"
         interval_seconds    = 10
-        timeout_seconds     = 5
-        failure_threshold   = 3
-        success_threshold   = 1
       }
 
-      startup_probe {
-        path                = "/health"
-        port                = 8000
-        transport           = "HTTP"
-        interval_seconds    = 5
-        timeout_seconds     = 5
-        failure_threshold   = 10
-        success_threshold   = 1
-      }
     }
 
     # Revision suffix for blue-green deployments

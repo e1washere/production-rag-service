@@ -94,7 +94,7 @@ jobs:
         echo "Waiting for application to be ready..."
         for i in {1..30}; do
           if curl -f -s "${{ steps.terraform.outputs.health_check_url }}" > /dev/null; then
-            echo "✅ Application is healthy!"
+            echo " Application is healthy!"
             break
           fi
           echo "Attempt $i/30: Application not ready yet, waiting 30s..."
@@ -116,18 +116,18 @@ jobs:
           -H "Content-Type: application/json" \
           -d '{"question": "What is machine learning?", "top_k": 3}' || exit 1
         
-        echo "✅ All post-deployment tests passed!"
+        echo " All post-deployment tests passed!"
 
     - name: Update deployment status
       if: always()
       run: |
         if [ "${{ job.status }}" = "success" ]; then
-          echo "🚀 Deployment successful!"
+          echo " Deployment successful!"
           echo "App URL: ${{ steps.terraform.outputs.app_url }}"
           echo "Health Check: ${{ steps.terraform.outputs.health_check_url }}"
           echo "API Docs: ${{ steps.terraform.outputs.api_docs_url }}"
         else
-          echo "❌ Deployment failed!"
+          echo " Deployment failed!"
         fi
 
     - name: Notify deployment status
@@ -184,4 +184,4 @@ jobs:
       run: |
         sleep 60
         curl -f "${{ steps.terraform.outputs.health_check_url }}" || exit 1
-        echo "✅ Rollback successful!"
+        echo " Rollback successful!"
