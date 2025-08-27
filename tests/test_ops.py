@@ -1,35 +1,29 @@
-"""Operational tests for deployment and rollback procedures."""
+"""Operational tests for RAG service."""
 
-import pytest
-from unittest.mock import Mock, patch
 import subprocess
-import json
+import pytest
 
 
 class TestCanaryDeployment:
     """Test canary deployment procedures."""
 
-    @patch('subprocess.run')
-    def test_canary_deploy_script_structure(self, mock_run):
+    def test_canary_deploy_script_structure(self):
         """Test canary deploy script has required components."""
-        mock_run.return_value = Mock(returncode=0, stdout=b"success")
         
         # Test script exists and is executable
         result = subprocess.run(['ls', '-la', 'scripts/canary-deploy.sh'], 
-                              capture_output=True, text=True)
+                              capture_output=True)
         assert result.returncode == 0
-        assert 'canary-deploy.sh' in result.stdout
+        assert b'canary-deploy.sh' in result.stdout
 
-    @patch('subprocess.run')
-    def test_rollback_script_structure(self, mock_run):
+    def test_rollback_script_structure(self):
         """Test rollback script has required components."""
-        mock_run.return_value = Mock(returncode=0, stdout=b"success")
         
         # Test script exists and is executable
         result = subprocess.run(['ls', '-la', 'scripts/rollback.sh'], 
-                              capture_output=True, text=True)
+                              capture_output=True)
         assert result.returncode == 0
-        assert 'rollback.sh' in result.stdout
+        assert b'rollback.sh' in result.stdout
 
 
 class TestSLOValidation:

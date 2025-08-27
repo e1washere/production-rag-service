@@ -1,26 +1,32 @@
-# Builder
-FROM python:3.11-slim AS builder
-WORKDIR /app
-RUN apt-get update && apt-get install -y build-essential curl && rm -rf /var/lib/apt/lists/*
-COPY pyproject.toml .
-RUN pip install --upgrade pip && pip install --no-cache-dir -e .
-RUN mkdir -p /app/.cache/index
-COPY .cache/index/ /app/.cache/index/
-
-# Final
+# Production Dockerfile for RAG Service
 FROM python:3.11-slim
+
 WORKDIR /app
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY app/ ./app/
-COPY scripts/ ./scripts/
-COPY data/sample/ ./data/sample/
-COPY data/docs/ ./data/docs/
-RUN mkdir -p /app/.cache/index
-COPY --from=builder /app/.cache/index/ /app/.cache/index/
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY app/simple_api.py ./app/
+COPY app/logging.py ./app/
+
+# Environment variables
 ENV PYTHONUNBUFFERED=1
-ENV INDEX_DIR=/app/.cache/index
+ENV ENVIRONMENT=production
+ENV PORT=8000
+
+# Expose port
 EXPOSE 8000
-HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
-CMD ["uvicorn","app.api:app","--host","0.0.0.0","--port","8000"]
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=3s --retries=20 \
+  CMD curl -fsS http://127.0.0.1:8000/healthz || exit 1
+
+# Start application
+CMD ["uvicorn", "app.simple_api:app", "--host", "0.0.0.0", "--port", "8000"]
