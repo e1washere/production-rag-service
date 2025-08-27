@@ -1,0 +1,30 @@
+name: Roadmap Task
+description: Create a roadmap task for the rag-service project
+title: "[Roadmap] "
+labels: ["roadmap"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this task important?
+      placeholder: Brief background and value.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is in scope? What is out of scope?
+      placeholder: Clear acceptance criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Implementation Plan
+      description: High-level steps with deliverables and test plan.
+      placeholder: Checklist of steps.
+    validations:
+      required: true
+
